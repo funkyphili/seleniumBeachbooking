@@ -1,10 +1,14 @@
-import time
-
+import sys
+import datetime
+import locale
+import csv
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
+import logging
+import time
 
-def book_slot(datum,day,timeslot,email):
+def book_slot(datum,day,timeslot,user):
 
     driver = webdriver.Chrome()
     driver.get("https://termine.moenchengladbach.de/select2?md=13")
@@ -25,10 +29,10 @@ def book_slot(datum,day,timeslot,email):
     time.sleep(1)
     filter = driver.find_element(By.ID,"ui-id-15")
     driver.execute_script("arguments[0].click();", filter)
-    time.sleep(1)
+    time.sleep(0.3)
     c = driver.find_element(By.ID,"ui-id-18")
     driver.execute_script("arguments[0].click();", c)
-    time.sleep(1)
+    time.sleep(0.3)
     d = driver.find_element(By.ID, "ui-id-17")
     driver.execute_script("arguments[0].click();", d)
     time.sleep(1)
@@ -40,7 +44,7 @@ def book_slot(datum,day,timeslot,email):
     driver.execute_script("arguments[0].setAttribute('value',arguments[1])", bis, datum)
 
 
-#filter time
+#filter booking_time
     zeit = driver.find_element(By.ID,"suggest_filter_timespan")
     time_str = timeslot[0:2] +" Uhr bis"
     cor_zeit = zeit.find_elements(By.XPATH,f"//div/div/label/span[contains(@title,'{time_str}')]")[0]
@@ -87,19 +91,19 @@ def book_slot(datum,day,timeslot,email):
 
     #driver.execute_script("arguments[0].innerText = 'Herr'", anrede)
     phone = driver.find_element(By.ID, "mobnr")
-    phone.send_keys("015123333951")
+    phone.send_keys("015112345678")
     phone.send_keys(Keys.RETURN)
 
     vorname = driver.find_element(By.ID, "vorname")
-    vorname.send_keys("Robin")
+    vorname.send_keys(user[0])
 
     nachname = driver.find_element(By.ID, "nachname")
-    nachname.send_keys("Walter")
+    nachname.send_keys(user[1])
 
     email1 = driver.find_element(By.ID, "email")
-    email1.send_keys(email)
+    email1.send_keys(user[2])
     email2 = driver.find_element(By.ID, "emailwhlg")
-    email2.send_keys(email)
+    email2.send_keys(user[2])
     email2.send_keys(Keys.RETURN)
 
 
@@ -112,16 +116,117 @@ def book_slot(datum,day,timeslot,email):
     driver.execute_script("arguments[0].click();", datenbox)
     time.sleep(0.1)
 
-    while True:
-        pass
 
     final_confirm = driver.find_element(By.ID, "chooseTerminButton")
     driver.execute_script("arguments[0].click();", final_confirm)
+    time.sleep(3)
+
+    return True
 
 
-    while True:
-        pass
+def write_dates(dates):
+
+    # first_date = datetime.date(2024, 4, 17)
+    # dates_to_book = []
+    # for i in range(30):
+    #     m_date = first_date + i * datetime.timedelta(weeks=1)
+    #     f_date = m_date + datetime.timedelta(days=2)
+    #     dates_to_book.append(m_date)
+    #     dates_to_book.append(f_date)
+
+    with open("dates.txt", "w", newline="") as csvwrite:
+        writer = csv.writer(csvwrite)
+        for date in dates:
+            writer.writerow([date.strftime("%d.%m.%Y"),date.strftime("%A")])
 
 
 if __name__ == "__main__":
-    book_slot("21.06.2024","Freitag","14:45","walter1357@gmx.de")
+
+
+
+
+
+    logger = logging.getLogger(__name__)
+    logging.basicConfig(filename='booking.log', level=logging.INFO)
+
+    locale.setlocale(locale.LC_TIME, "de_DE")
+
+    #write_dates("bla")
+
+    users = []
+    with open("emails.txt") as csvfile:
+        reader = csv.reader(csvfile,delimiter=",")
+        for row in reader:
+            users.append(row)
+
+    #print(users)
+
+    dates = []
+    with open("dates.txt") as csvfile:
+        reader = csv.reader(csvfile, delimiter=",")
+        for row in reader:
+            dates.append(row)
+
+    #print(dates)
+
+    locale.setlocale(locale.LC_TIME,"de_DE")
+    #print(dates_to_book[0].strftime("%d.%m.%Y"))
+    #print(dates_to_book[0].strftime("%A",))
+
+    book_slot("19.06.2024","Mittwoch","17:45",["Karl","Milde","Karl.milde89@gmail.com","1713214883"])
+    sys.exit(0)
+
+    for user in users:
+
+        last_booked =  time.time() - int(user[3])
+        print(last_booked)
+
+        if last_booked < 24*60*60:
+            continue
+
+        date_1,weekday_1 = dates.pop(0)
+        if date_1 == " ":
+            sys.exit()
+
+        booking_time = "16:15"
+
+        if weekday_1 == "Freitag":
+            booking_time = "14:45"
+
+        passed = False
+        try:
+            passed = book_slot(date_1,weekday_1,booking_time,user)
+        except Exception as error:
+            print(error)
+
+        if passed:
+            print(f"date : {date_1},{weekday_1},{booking_time},{user} booked")
+            logger.info(f"date : {date_1},{weekday_1},{booking_time},{user} booked")
+        else:
+            print(f"booking of {date_1},{weekday_1},{booking_time},{user} failed")
+            logger.warning(f"booking of {date_1},{weekday_1},{booking_time},{user} failed")
+
+        booking_time = "17:45"
+
+        if weekday_1 == "Freitag":
+            booking_time = "16:15"
+
+
+        passed = False
+        try:
+            passed = book_slot(date_1, weekday_1, booking_time, user)
+        except Exception as error:
+            print(error)
+
+        if passed:
+            print(f"date : {date_1},{weekday_1},{booking_time},{user} booked")
+            logger.info(f"date : {date_1},{weekday_1},{booking_time},{user} booked")
+        else:
+            print(f"booking of {date_1},{weekday_1},{booking_time},{user} failed")
+            logger.warning(f"booking of {date_1},{weekday_1},{booking_time},{user} failed")
+
+
+
+
+    sys.exit(0)
+    #book_slot("21.06.2024","Freitag","14:45","walter1357@gmx.de")
